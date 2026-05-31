@@ -1,0 +1,16 @@
+# Python virtual environment — huge and machine-specific, never upload
+venv/
+
+# The local database — has your test data, don't publish
+db.sqlite3
+
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Environment / secrets files (we'll use one of these on Render)
+.env
+
+# OS / editor junk
+.DS_Store
+.vscode/

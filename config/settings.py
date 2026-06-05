@@ -11,7 +11,6 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
-from pathlib import Path
 import os
 import dj_database_url
 
@@ -141,14 +140,11 @@ CORS_ALLOWED_ORIGINS = [
     "https://www.pureswish.com",
 ]
 
-# ---- Email (Gmail SMTP) ----
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.gmail.com"
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-DEFAULT_FROM_EMAIL = os.environ.get("EMAIL_HOST_USER", "")
+# ---- Email (Resend HTTP API) ----
+# NOTE: Render's free tier blocks outbound SMTP, so we send via Resend's HTTPS
+# API instead. The key + "from" address come from environment variables.
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
 
 # Where the password-reset link should point (the frontend)
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")

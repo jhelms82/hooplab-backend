@@ -6,8 +6,8 @@ from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
-from django.core.mail import send_mail
 from django.conf import settings
+import resend
 from .models import Player, Session, ShotEntry
 from .serializers import PlayerSerializer, SessionSerializer, ShotEntrySerializer, SignupSerializer
 
@@ -73,14 +73,24 @@ class SignupView(generics.CreateAPIView):
 # ============================================================================
 # PASSWORD RESET + FORGOT USERNAME
 # ----------------------------------------------------------------------------
-# These let a user who's locked out recover access by email. The flow:
-#   1) request_password_reset  -> they enter their email; we email a reset link
-#   2) confirm_password_reset  -> the link lands them on a page; they set a new pw
-#   3) forgot_username         -> they enter their email; we email their username
+# These let a user who's locked out recover access by email.
 #
-# We use Django's built-in token generator (the same machinery the admin uses)
-# so we don't have to invent our own secure tokens.
+# IMPORTANT: We send email via Resend's HTTP API (not SMTP). Render's free tier
+# blocks outbound SMTP ports, so Django's send_mail() hangs forever there.
+# Resend sends over HTTPS (port 443), which works fine on Render.
 # ============================================================================
+
+
+# NOTE: small helper that actually sends an email through Resend.
+# Reads the API key + "from" address from settings (which read env vars).
+def send_email(to_address, subject, body):
+    resend.api_key = settings.RESEND_API_KEY
+    resend.Emails.send({
+        "from": settings.RESEND_FROM_EMAIL,
+        "to": [to_address],
+        "subject": subject,
+        "text": body,
+    })
 
 
 # NOTE: helper — checks our password rules (same as the signup form).
@@ -112,9 +122,10 @@ def request_password_reset(request):
         token = default_token_generator.make_token(user)
         reset_link = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
 
-        send_mail(
+        send_email(
+            to_address=email,
             subject="Reset your PureSwish password",
-            message=(
+            body=(
                 f"Hi {user.username},\n\n"
                 f"We got a request to reset your PureSwish password.\n"
                 f"Click the link below to set a new one:\n\n"
@@ -123,9 +134,6 @@ def request_password_reset(request):
                 f"your password won't change.\n\n"
                 f"— PureSwish"
             ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[email],
-            fail_silently=False,
         )
 
     return Response(
@@ -176,17 +184,15 @@ def forgot_username(request):
     # if we actually found account(s). If an email has multiple accounts, list them.
     if users.exists():
         usernames = "\n".join(u.username for u in users)
-        send_mail(
+        send_email(
+            to_address=email,
             subject="Your PureSwish username",
-            message=(
+            body=(
                 f"Hi,\n\n"
                 f"Here is the username for your PureSwish account:\n\n"
                 f"{usernames}\n\n"
                 f"— PureSwish"
             ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[email],
-            fail_silently=False,
         )
 
     return Response(

@@ -105,41 +105,35 @@ def password_is_valid(pw):
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def request_password_reset(request):
-    """Step 1: user submits their email; if an account exists, email a link."""
+    """TEMPORARY DIAGNOSTIC VERSION — reveals what's happening. Revert after."""
     email = request.data.get('email', '').strip()
 
-    # NOTE: find the user by email. There could in theory be more than one
-    # account with the same email, so we take the first.
     user = User.objects.filter(email__iexact=email).first()
 
-    # NOTE: only actually send if we found someone — BUT we always return the
-    # same response either way, so nobody can use this to discover which
-    # emails have accounts. (Standard security practice.)
+    debug = {
+        "email_received": email,
+        "user_found": bool(user),
+        "username": user.username if user else None,
+        "key_set": bool(settings.RESEND_API_KEY),
+        "from_email": settings.RESEND_FROM_EMAIL,
+        "frontend_url": settings.FRONTEND_URL,
+    }
+
     if user:
-        # NOTE: uid = the user's id, encoded; token = a secure one-time code
-        # that expires and becomes invalid once the password changes.
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
         reset_link = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
+        try:
+            result = send_email(
+                to_address=email,
+                subject="Reset your PureSwish password",
+                body=f"Reset your password:\n\n{reset_link}\n\n— PureSwish",
+            )
+            debug["send_result"] = str(result)
+        except Exception as e:
+            debug["send_error"] = str(e)
 
-        send_email(
-            to_address=email,
-            subject="Reset your PureSwish password",
-            body=(
-                f"Hi {user.username},\n\n"
-                f"We got a request to reset your PureSwish password.\n"
-                f"Click the link below to set a new one:\n\n"
-                f"{reset_link}\n\n"
-                f"If you didn't ask for this, you can ignore this email — "
-                f"your password won't change.\n\n"
-                f"— PureSwish"
-            ),
-        )
-
-    return Response(
-        {"message": "If an account exists for that email, a reset link has been sent."}
-    )
-
+    return Response(debug)
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])

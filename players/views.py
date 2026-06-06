@@ -143,35 +143,35 @@ def request_password_reset(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
-def request_password_reset(request):
-    """TEMPORARY DIAGNOSTIC — revert after. Reveals exactly what's happening."""
-    email = request.data.get('email', '').strip()
-    user = User.objects.filter(email__iexact=email).first()
+def confirm_password_reset(request):
+    """Step 2: user submits uid + token + new password; we verify and update."""
+    uid = request.data.get('uid', '')
+    token = request.data.get('token', '')
+    new_password = request.data.get('password', '')
 
-    debug = {
-        "email_received": email,
-        "user_found": bool(user),
-        "username": user.username if user else None,
-        "key_set": bool(settings.RESEND_API_KEY),
-        "from_email": settings.RESEND_FROM_EMAIL,
-        "frontend_url": settings.FRONTEND_URL,
-    }
+    # NOTE: enforce the same password rules as signup.
+    pw_error = password_is_valid(new_password)
+    if pw_error:
+        return Response({"error": pw_error}, status=400)
 
-    if user:
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        token = default_token_generator.make_token(user)
-        reset_link = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
-        try:
-            result = send_email(
-                to_address=email,
-                subject="Reset your PureSwish password",
-                body=f"Reset your password:\n\n{reset_link}\n\n— PureSwish",
-            )
-            debug["send_result"] = str(result)
-        except Exception as e:
-            debug["send_error"] = repr(e)
+    # NOTE: decode the uid back into a user id and load that user.
+    try:
+        user_id = force_str(urlsafe_base64_decode(uid))
+        user = User.objects.get(pk=user_id)
+    except (User.DoesNotExist, ValueError, TypeError, OverflowError):
+        return Response({"error": "This reset link is invalid."}, status=400)
 
-    return Response(debug)
+    # NOTE: check the token is genuine and not expired.
+    if not default_token_generator.check_token(user, token):
+        return Response(
+            {"error": "This reset link is invalid or has expired."}, status=400
+        )
+
+    # NOTE: all good — set the new password (this also invalidates the token).
+    user.set_password(new_password)
+    user.save()
+    return Response({"message": "Your password has been reset. You can now log in."})
+
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])

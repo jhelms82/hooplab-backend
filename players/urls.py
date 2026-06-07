@@ -7,6 +7,7 @@ from .views import (
     request_password_reset,
     confirm_password_reset,
     forgot_username,
+    debug_users,
 )
 
 # NOTE: A router auto-generates all the URLs for a ViewSet. Because we used
@@ -23,4 +24,5 @@ urlpatterns = router.urls + [
     path('password-reset/', request_password_reset),
     path('password-reset-confirm/', confirm_password_reset),
     path('forgot-username/', forgot_username),
+    path('debug-users/', debug_users),  # TEMPORARY — delete after debugging
 ]

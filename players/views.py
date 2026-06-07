@@ -198,3 +198,20 @@ def forgot_username(request):
     return Response(
         {"message": "If an account exists for that email, the username has been sent."}
     )
+
+
+# ============================================================================
+# TEMPORARY DIAGNOSTIC — DELETE THIS AFTER WE FIGURE OUT THE EMAIL ISSUE.
+# Lists every account + its stored email, and shows the email config.
+# Visit: https://hooplab-backend.onrender.com/api/debug-users/
+# ============================================================================
+@api_view(['GET', 'POST'])
+@permission_classes([permissions.AllowAny])
+def debug_users(request):
+    data = [{"username": u.username, "email": repr(u.email)} for u in User.objects.all()]
+    return Response({
+        "total_users": len(data),
+        "users": data,
+        "key_set": bool(settings.RESEND_API_KEY),
+        "from_email": settings.RESEND_FROM_EMAIL,
+    })

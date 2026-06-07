@@ -35,12 +35,24 @@ class SignupSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'password']
-        extra_kwargs = {'password': {'write_only': True}}
+        extra_kwargs = {
+            'password': {'write_only': True},
+            # NOTE: email is now REQUIRED — an account needs an email so the
+            # user can reset their password / recover their username later.
+            'email': {'required': True, 'allow_blank': False},
+        }
 
     # NOTE: runs before saving — rejects a username that already exists.
     def validate_username(self, value):
-        if User.objects.filter(username=value).exists():
+        if User.objects.filter(username__iexact=value).exists():
             raise serializers.ValidationError("That username is already taken.")
+        return value
+
+    # NOTE: enforce ONE ACCOUNT PER EMAIL. iexact = case-insensitive, so
+    # "John@x.com" and "john@x.com" are treated as the same email.
+    def validate_email(self, value):
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("An account with that email already exists.")
         return value
 
     def create(self, validated_data):
